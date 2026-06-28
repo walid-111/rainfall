@@ -2,7 +2,7 @@
 2. Nous pouvons voir que a la fin du programme, la fonction setAnnotation fais un memcpy sans verifier la taille qu'il copie
 3. Nous allons donc pouvoir overflow, pour cela j'ai besoin de l'offset entre v2 et v1 -> ltrace ./level9 "aaaa" -> et je soustrais les deux adresses de v2 et v1 pour l'avoir -> 108
 4. j'ai aussi besoin de l'adresse de system -> je la recupere avec gdb -> 0xb7d86060
-5. Nous pouvons maintenant construire l'exploit:
-Nous plaçons l'adresse de system au tout début de notre chaîne (dans v2). Ensuite, nous écrivons l'adresse 0x0804a00c (l'adresse exacte où memcpy commence à copier). Cela va écraser le pointeur de fonction de v1.Enfin, nous ajoutons ;/bin/sh.Au moment de l'appel final, le programme va lire le pointeur de v1 (qui vaut maintenant 0x0804a00c), se rendre à cette adresse, y trouver l'adresse de system et l'exécuter en lui passant toute la chaîne en argument. Le point-virgule permettra d'ignorer le début de la chaîne et d'exécuter directement /bin/sh
-(python -c 'print("\x60\x60\xd8\xb7" + "a" * 104 + "\x0c\xa0\04\x08" + ";/bin/sh" )') | ./level9
-
+5. Nous pouvons maintenant construire l'exploit -> nous plaçons l'adresse de system au tout début de notre chaîne (dans v2). Ensuite, nous écrivons l'adresse 0x0804a00c (l'adresse exacte où memcpy commence à copier).
+Cela va écraser le pointeur de fonction de v1. Enfin, nous ajoutons ;/bin/sh.Au moment de l'appel final, le programme va lire le pointeur de v1 (qui vaut maintenant 0x0804a00c), se rendre à cette adresse,
+y trouver l'adresse de system et l'exécuter en lui passant toute la chaîne en argument. Le point-virgule permettra d'ignorer le début de la chaîne et d'exécuter directement /bin/sh ce qui
+nous donne -> ./level9 $(python -c 'print("\x60\x60\xd8\xb7" + "a" * 104 + "\x0c\xa0\04\x08" + ";/bin/sh" )')
