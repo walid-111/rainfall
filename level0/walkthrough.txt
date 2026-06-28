@@ -1,0 +1,32 @@
+1. ls -la
+   -> level0
+
+2. ./level0
+   -> Seg fault
+   -> le programme attend p-e un argument
+
+3. ./level0 1
+   -> "No !" -> le programme ne crash plus avec un argument
+
+4. gdb level0
+   run pour voir ce qu'il se passe
+   -> SIGSEGV dans __strtol_l_internal sans argument
+   -> confirme l'usage de atoi
+
+5. (gdb) info functions puis (gdb) disas main
+   -> call atoi
+   -> cmp $0x1a7,%eax
+   -> jne <échec>
+   -> le programme compare argv[1] converti en int à 0x1a7
+
+6. 0x1a7 en décimal = 423
+
+7. ./level0 423
+   -> aucun message d'erreur, le prompt change ($ au lieu de level0@RainFall:~$)
+
+8. whoami
+   -> level1
+   -> le binaire ouvre un /bin/sh avec setuid level1
+
+9. cat /home/user/level1/.pass
+   -> 1fe8a524fa4bec01ca4ea2a869af2a02260d4a7d5fe7e7c24d8617e6dca12d3a
